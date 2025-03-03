@@ -174,7 +174,7 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
 
 
 def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations):
-    SVID_params = get_SVJD_parameters(start_date=start_time, time_increment=time_increment time_length=time_length)
+    SVID_params = get_SVJD_parameters(start_date=start_time, time_increment=time_increment, time_length=time_length)
     dt = time_increment
     S0 = current_price
     N = time_length

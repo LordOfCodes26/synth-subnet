@@ -77,6 +77,9 @@ class Miner(BaseMinerNeuron):
             num_simulations=num_simulations,
             # sigma=sigma,
         )
+        bt.logging.info(
+            f"Prediction: {prediction}"
+        )
 
         synapse.simulation_output = prediction
 
