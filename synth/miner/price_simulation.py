@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import requests
+import bittensor as bt
 from arch import arch_model
 from properscoring import crps_ensemble
 
@@ -169,6 +170,9 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
         "mu_J": mu_J,
         "sigma_J": sigma_J
     }
+    bt.logging.info(
+            f"svjd parameters: {svjd_params}"
+        )
     return svjd_params
 
 
@@ -209,5 +213,7 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
         Jumps = np.where(num_jumps > 0, np.exp(mu_J + sigma_J * np.random.randn(num_paths)) - 1, 0)  # Only apply when jump occurs
         # BTC price process
         S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t]) * (1 + Jumps)
-    
+    bt.logging.info(
+            f"S[1]: {S[1]}"
+        )
     return np.transpose(S)
