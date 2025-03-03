@@ -67,7 +67,7 @@ class Miner(BaseMinerNeuron):
         num_simulations = simulation_input.num_simulations
 
         # Standard deviation of the simulated price path
-        sigma = self.config.simulation.sigma
+        # sigma = self.config.simulation.sigma
 
         prediction = generate_simulations(
             start_time=dt,
@@ -75,7 +75,7 @@ class Miner(BaseMinerNeuron):
             time_increment=time_increment,
             time_length=time_length,
             num_simulations=num_simulations,
-            sigma=sigma,
+            # sigma=sigma,
         )
 
         synapse.simulation_output = prediction

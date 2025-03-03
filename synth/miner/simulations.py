@@ -1,10 +1,11 @@
 from synth.miner.price_simulation import (
-    simulate_crypto_price_paths,
+    simulate_crypto_price_paths_SVID,
     get_asset_price,
 )
 from synth.utils.helpers import (
     convert_prices_to_time_format,
 )
+from datetime import datetime
 
 
 def generate_simulations(
@@ -13,7 +14,7 @@ def generate_simulations(
     time_increment=300,
     time_length=86400,
     num_simulations=1,
-    sigma=0.01,
+    # sigma=0.01,
 ):
     """
     Generate simulated price paths.
@@ -36,12 +37,13 @@ def generate_simulations(
     if current_price is None:
         raise ValueError(f"Failed to fetch current price for asset: {asset}")
 
-    simulations = simulate_crypto_price_paths(
+    simulations = simulate_crypto_price_paths_SVID(
+        start_time=datetime.fromisoformat(start_time)
         current_price=current_price,
         time_increment=time_increment,
         time_length=time_length,
         num_simulations=num_simulations,
-        sigma=sigma,
+        # sigma=sigma,
     )
 
     predictions = convert_prices_to_time_format(
