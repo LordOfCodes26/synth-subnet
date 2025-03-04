@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import requests
-import bittensor as bt
 from datetime import datetime
+import bittensor as bt
 from arch import arch_model
 from properscoring import crps_ensemble
 
@@ -15,7 +15,6 @@ def get_asset_price(asset="BTC"):
     Returns:
         float: Current asset price.
     """
-    bt.logging.info("Here is get current BTC price")
 
     if asset == "BTC":
         btc_price_id = (
@@ -24,11 +23,12 @@ def get_asset_price(asset="BTC"):
         endpoint = f"https://hermes.pyth.network/api/latest_price_feeds?ids[]={btc_price_id}"  # TODO: this endpoint is deprecated
         try:
             response = requests.get(endpoint)
-            bt.logging.info(f"Here is get current BTC price: {response}")
             response.raise_for_status()
-            data = response.json()[0]  # First item in the list
-            
+            data = response.json()[0]  # First item in the list         
+
             price = float(data["price"]["price"]) * (10 ** int(data["price"]["expo"]))
+            print(f"BTC Price: ${price}")
+
             return price
 
         except Exception as e:
@@ -75,7 +75,6 @@ def get_asset_price(asset="BTC"):
 
 
 def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
-    bt.logging.info(f"Here is SVD_parameters")
 
     start_time = datetime.fromisoformat(start_time).timestamp()
     # Define the Pyth TradingView endpoint for historical BTC data
@@ -88,7 +87,6 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "to": int(start_time),
         "resolution": f"{time_increment // 60}" #calculate minute
     }
-    bt.logging.info(f"params: {params}")
 
     # Fetch data from Pyth API
     try:
@@ -105,7 +103,6 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "close": data["c"],
         "volume": data["v"]
     })
-    bt.logging.info(f"BTC_df:{btc_df}")
 
     # Convert timestamp to readable datetime format
     btc_df["timestamp"] = pd.to_datetime(btc_df["timestamp"], unit="s")
@@ -163,14 +160,12 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "mu_J": mu_J,
         "sigma_J": sigma_J
     }
-    bt.logging.info(f"Here is SVD_parameters:{svjd_params}")
 
     return svjd_params
 
 
 
 def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations) -> np.array:
-    bt.logging.info("Here is simulate_crypto_price_paths_SVID")
     SVID_params = get_SVJD_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
     bt.logging.info(f"Here is SVID_params: {SVID_params}")
 
@@ -209,9 +204,5 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
         Jumps = np.where(num_jumps > 0, np.exp(mu_J + sigma_J * np.random.randn(num_paths)) - 1, 0)  # Only apply when jump occurs
         # BTC price process
         S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t]) * (1 + Jumps)
-
-    bt.logging.info(
-            f"S: {S}"
-        )
         
     return np.transpose(S)

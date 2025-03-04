@@ -57,9 +57,6 @@ class Miner(BaseMinerNeuron):
         """
         simulation_input = synapse.simulation_input
         bt.logging.info(
-                    f"Synapse: {synapse}"
-                )
-        bt.logging.info(
             f"Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {simulation_input.start_time}"
         )
 
@@ -68,10 +65,6 @@ class Miner(BaseMinerNeuron):
         time_increment = simulation_input.time_increment
         time_length = simulation_input.time_length
         num_simulations = simulation_input.num_simulations
-
-        bt.logging.info(
-            f"Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {simulation_input}"
-        )
 
         # Standard deviation of the simulated price path
         # sigma = self.config.simulation.sigma
@@ -83,15 +76,7 @@ class Miner(BaseMinerNeuron):
             time_length=time_length,
             num_simulations=num_simulations,
         )
-        bt.logging.info(
-            f"Prediction: {prediction}"
-        )
-
         synapse.simulation_output = prediction
-
-        bt.logging.info(
-                    f"Synapse: {synapse}"
-                )
 
         return synapse
 
