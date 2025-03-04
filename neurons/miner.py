@@ -79,7 +79,6 @@ class Miner(BaseMinerNeuron):
             time_increment=time_increment,
             time_length=time_length,
             num_simulations=num_simulations,
-            # sigma=sigma,
         )
         bt.logging.info(
             f"Prediction: {prediction}"

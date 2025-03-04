@@ -160,9 +160,7 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
 
 def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations) -> np.array:
     SVID_params = get_SVJD_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
-    bt.logging.info(
-            f"SVID_params: {SVID_params}"
-        )
+    print(SVID_params)
     S0 = current_price
     T = time_length
     N = time_length // time_increment
