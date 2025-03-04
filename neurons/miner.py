@@ -57,6 +57,9 @@ class Miner(BaseMinerNeuron):
         """
         simulation_input = synapse.simulation_input
         bt.logging.info(
+                    f"Synapse: {synapse}"
+                )
+        bt.logging.info(
             f"Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {simulation_input.start_time}"
         )
 
@@ -85,6 +88,10 @@ class Miner(BaseMinerNeuron):
         )
 
         synapse.simulation_output = prediction
+
+        bt.logging.info(
+                    f"Synapse: {synapse}"
+                )
 
         return synapse
 
