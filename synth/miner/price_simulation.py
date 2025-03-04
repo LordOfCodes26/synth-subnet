@@ -15,6 +15,8 @@ def get_asset_price(asset="BTC"):
     Returns:
         float: Current asset price.
     """
+    bt.logging.info("Here is get current BTC price")
+
     if asset == "BTC":
         btc_price_id = (
             "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
@@ -22,6 +24,7 @@ def get_asset_price(asset="BTC"):
         endpoint = f"https://hermes.pyth.network/v2/updates/price/stream?ids[]={btc_price_id}"  # TODO: this endpoint is deprecated
         try:
             response = requests.get(endpoint)
+            bt.logging.info(f"Here is get current BTC price: {response}")
             response.raise_for_status()
             data = response.json()[0]  # First item in the list
             
