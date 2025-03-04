@@ -28,7 +28,7 @@ def generate_simulations(
     Returns:
         numpy.ndarray: Simulated price paths.
     """
-    print("Here is generate_simulations")
+    bt.logging.info("Here is generate_simulations")
     if start_time is None:
         raise ValueError("Start time must be provided.")
 
@@ -45,7 +45,7 @@ def generate_simulations(
         # sigma=sigma,
     )
 
-    print(simulations)
+    bt.logging.info(simulations)
 
     predictions = convert_prices_to_time_format(
         simulations.tolist(), start_time, time_increment
