@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import requests
 import bittensor as bt
+from datetime import datetime
 from arch import arch_model
 from properscoring import crps_ensemble
 
@@ -25,7 +26,6 @@ def get_asset_price(asset="BTC"):
             data = response.json()[0]  # First item in the list
             
             price = float(data["price"]["price"]) * (10 ** int(data["price"]["expo"]))
-            print(f"BTC Price: ${price}")
             return price
 
         except Exception as e:
@@ -71,16 +71,18 @@ def get_asset_price(asset="BTC"):
 #     return np.array(price_paths)
 
 
-def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
+def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
+
+    start_time = datetime.fromisoformat(start_time).timestamp()
     # Define the Pyth TradingView endpoint for historical BTC data
     pyth_tv_url = "https://benchmarks.pyth.network/v1/shims/tradingview/history"
 
     # Set parameters for data retrieval (adjust the start and end times)
     params = {
         "symbol": asset,
-        "from": start_date - time_increment * (time_increment - 1),  
-        "to": start_date, 
-        "resolution": f"{time_length}"
+        "from": int(start_time - time_increment * (time_length // time_increment - 1)),  
+        "to": int(start_time),
+        "resolution": f"{time_increment // 60}" #calculate minute
     }
 
     # Fetch data from Pyth API
@@ -105,17 +107,10 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
     # Drop NaN values
     btc_df.dropna(inplace=True)
 
-    # Display the first few rows
-    print(btc_df.head())
-
     # Compute annualized drift (mean return)
-    mu = btc_df["log_return"].mean() * 252  # 252 trading days in a year
-
+    mu = btc_df["log_return"].mean() * time_length / time_increment  # 
     # Compute initial variance (V0)
     V0 = btc_df["log_return"].var()
-
-    print(f"Estimated Drift (mu): {mu:.6f}")
-    print(f"Estimated Initial Variance (V0): {V0:.6f}")
 
     # Define jump threshold (2 standard deviations)
     threshold = 2 * btc_df["log_return"].std()
@@ -123,8 +118,8 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
     # Identify jumps as large price movements
     jumps = btc_df[np.abs(btc_df["log_return"]) > threshold]["log_return"]
 
-    # Compute jump intensity (λ): Average jumps per year
-    lambda_jump = len(jumps) / len(btc_df) * 252  
+    # Compute jump intensity (λ): Average jumps per day
+    lambda_jump = len(jumps) / len(btc_df) * time_length / time_increment  
 
     # Mean jump size (μ_J)
     mu_J = jumps.mean()
@@ -132,14 +127,9 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
     # Jump size volatility (σ_J)
     sigma_J = jumps.std()
 
-    print(f"Jump Intensity (lambda): {lambda_jump:.4f} jumps/year")
-    print(f"Mean Jump Size (mu_J): {mu_J:.6f}")
-    print(f"Jump Size Volatility (sigma_J): {sigma_J:.6f}")
-
-
 
     # Fit GARCH(1,1) model to log returns
-    garch_model = arch_model(btc_df["log_return"], vol="Garch", p=1, q=1)
+    garch_model = arch_model(btc_df["log_return"], vol="Garch", p=1, q=1, rescale=False)
     garch_fit = garch_model.fit(disp="off")
 
     # Extract GARCH model parameters
@@ -147,17 +137,11 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
     theta = garch_fit.conditional_volatility.mean()**2  # Long-run variance
     sigma_V = garch_fit.params["alpha[1]"]  # Volatility of variance
 
-    print(f"Estimated Mean Reversion Speed (kappa): {kappa:.6f}")
-    print(f"Estimated Long-Run Variance (theta): {theta:.6f}")
-    print(f"Estimated Volatility of Variance (sigma_V): {sigma_V:.6f}")
-
     # Compute rolling volatility (10-period moving standard deviation)
     btc_df["rolling_vol"] = btc_df["log_return"].rolling(window=10).std()
 
     # Estimate correlation between returns and volatility
     rho = btc_df["log_return"].corr(btc_df["rolling_vol"])
-
-    print(f"Estimated Correlation (rho): {rho:.6f}")
 
     svjd_params = {
         "mu": mu,
@@ -170,18 +154,16 @@ def get_SVJD_parameters(start_date : int, time_increment: int, time_length: int,
         "mu_J": mu_J,
         "sigma_J": sigma_J
     }
-    bt.logging.info(
-            f"svjd parameters: {svjd_params}"
-        )
     return svjd_params
 
 
 
-def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations):
-    SVID_params = get_SVJD_parameters(start_date=start_time, time_increment=time_increment, time_length=time_length)
-    dt = time_increment
+def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations) -> np.array:
+    SVID_params = get_SVJD_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
     S0 = current_price
-    N = time_length
+    T = time_length
+    N = time_length // time_increment
+    dt = N/T
     mu = SVID_params["mu"] # Expected return
     V0 = SVID_params["V0"] # Initial variance
     kappa = SVID_params['kappa'] # Mean reversion speed of variance
@@ -191,8 +173,8 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
     lambda_jump = SVID_params['lambda_jump'] # Jump intensity (expected jumps per year)
     mu_J = SVID_params['mu_J'] # Average jump size (log-normal)
     sigma_J = SVID_params['sigma_J'] # Jump volatility
-    num_paths = num_simulations 
-
+    num_paths = num_simulations
+    
     # Correlated Brownian motions
     W_S = np.random.randn(N, num_paths)  # BTC price Brownian motion
     W_V = rho * W_S + np.sqrt(1 - rho**2) * np.random.randn(N, num_paths)  # Volatility Brownian motion
@@ -213,7 +195,5 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
         Jumps = np.where(num_jumps > 0, np.exp(mu_J + sigma_J * np.random.randn(num_paths)) - 1, 0)  # Only apply when jump occurs
         # BTC price process
         S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t]) * (1 + Jumps)
-    bt.logging.info(
-            f"S[1]: {S[1]}"
-        )
+        
     return np.transpose(S)

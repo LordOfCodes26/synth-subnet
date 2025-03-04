@@ -5,8 +5,6 @@ from synth.miner.price_simulation import (
 from synth.utils.helpers import (
     convert_prices_to_time_format,
 )
-from datetime import datetime
-
 
 def generate_simulations(
     asset="BTC",
@@ -38,7 +36,7 @@ def generate_simulations(
         raise ValueError(f"Failed to fetch current price for asset: {asset}")
 
     simulations = simulate_crypto_price_paths_SVID(
-        start_time=datetime.fromisoformat(start_time),
+        start_time=start_time,
         current_price=current_price,
         time_increment=time_increment,
         time_length=time_length,
