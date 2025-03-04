@@ -72,6 +72,7 @@ def get_asset_price(asset="BTC"):
 
 
 def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
+    bt.logging.info(f"Here is SVD_parameters")
 
     start_time = datetime.fromisoformat(start_time).timestamp()
     # Define the Pyth TradingView endpoint for historical BTC data
@@ -84,11 +85,14 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "to": int(start_time),
         "resolution": f"{time_increment // 60}" #calculate minute
     }
+    bt.logging.info(f"params: {params}")
 
     # Fetch data from Pyth API
-    response = requests.get(pyth_tv_url, params=params)
-    data = response.json()
-
+    try:
+        response = requests.get(pyth_tv_url, params=params)
+        data = response.json()
+    except Exception as e:
+                print(f"Error: {e}")
     # Convert response to DataFrame
     btc_df = pd.DataFrame({
         "timestamp": data["t"],  # Time in Unix format
@@ -98,6 +102,8 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "close": data["c"],
         "volume": data["v"]
     })
+    bt.logging.info(f"BTC_df:{btc_df}")
+
     # Convert timestamp to readable datetime format
     btc_df["timestamp"] = pd.to_datetime(btc_df["timestamp"], unit="s")
 
@@ -154,6 +160,8 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
         "mu_J": mu_J,
         "sigma_J": sigma_J
     }
+    bt.logging.info(f"Here is SVD_parameters:{svjd_params}")
+
     return svjd_params
 
 
