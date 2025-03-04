@@ -77,11 +77,12 @@ class Miner(BaseMinerNeuron):
         # sigma = self.config.simulation.sigma
 
         prediction = generate_simulations(
-            start_time=dt,
+            # start_time=dt,
             asset=asset,
-            time_increment=time_increment,
-            time_length=time_length,
-            num_simulations=num_simulations,
+            start_time="2025-03-04T05:16:00+00:00",
+            time_increment=300,
+            time_length=86400,
+            num_simulations=100,
         )
         bt.logging.info(
             f"Prediction: {prediction}"
