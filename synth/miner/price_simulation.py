@@ -160,6 +160,9 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
 
 def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations) -> np.array:
     SVID_params = get_SVJD_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
+    bt.logging.info(
+            f"SVID_params: {SVID_params}"
+        )
     S0 = current_price
     T = time_length
     N = time_length // time_increment
@@ -195,5 +198,9 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
         Jumps = np.where(num_jumps > 0, np.exp(mu_J + sigma_J * np.random.randn(num_paths)) - 1, 0)  # Only apply when jump occurs
         # BTC price process
         S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t]) * (1 + Jumps)
+
+    bt.logging.info(
+            f"S: {S}"
+        )
         
     return np.transpose(S)

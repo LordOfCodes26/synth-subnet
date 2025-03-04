@@ -2,6 +2,7 @@ from synth.miner.price_simulation import (
     simulate_crypto_price_paths_SVID,
     get_asset_price,
 )
+import bittensor as bt
 from synth.utils.helpers import (
     convert_prices_to_time_format,
 )
@@ -43,6 +44,10 @@ def generate_simulations(
         num_simulations=num_simulations,
         # sigma=sigma,
     )
+
+    bt.logging.info(
+            f"simulations: {simulations}"
+        )
 
     predictions = convert_prices_to_time_format(
         simulations.tolist(), start_time, time_increment
