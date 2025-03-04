@@ -83,7 +83,7 @@ def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset
     # Set parameters for data retrieval (adjust the start and end times)
     params = {
         "symbol": asset,
-        "from": int(start_time - time_increment * (time_length // time_increment - 1)),  
+        "from": int(start_time - time_increment * (time_length * 15 // time_increment - 1)),  
         "to": int(start_time),
         "resolution": f"{time_increment // 60}" #calculate minute
     }
