@@ -74,119 +74,82 @@ def get_asset_price(asset="BTC"):
 #     return np.array(price_paths)
 
 
-def get_SVJD_parameters(start_time, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
-
+def get_Heston_parameters(start_time, time_increment: int, time_length: int, asset="Crypto.BTC/USD") -> dict:
     start_time = datetime.fromisoformat(start_time).timestamp()
-    # Define the Pyth TradingView endpoint for historical BTC data
     pyth_tv_url = "https://benchmarks.pyth.network/v1/shims/tradingview/history"
 
-    # Set parameters for data retrieval (adjust the start and end times)
     params = {
         "symbol": asset,
-        "from": int(start_time - time_increment * (time_length * 15 // time_increment - 1)),  
+        "from": int(start_time - time_increment * (time_length * 180 // time_increment - 1)),  
         "to": int(start_time),
-        "resolution": f"{time_increment // 60}" #calculate minute
+        "resolution": f"{60}"  # Minute intervals
     }
 
-    # Fetch data from Pyth API
-    try:
-        response = requests.get(pyth_tv_url, params=params)
-        data = response.json()
-    except Exception as e:
-                print(f"Error: {e}")
-    # Convert response to DataFrame
+    response = requests.get(pyth_tv_url, params=params)
+    data = response.json()
+
     btc_df = pd.DataFrame({
-        "timestamp": data["t"],  # Time in Unix format
+        "timestamp": data["t"],
         "open": data["o"],
         "high": data["h"],
         "low": data["l"],
         "close": data["c"],
         "volume": data["v"]
     })
-
-    # Convert timestamp to readable datetime format
     btc_df["timestamp"] = pd.to_datetime(btc_df["timestamp"], unit="s")
-
-    # Compute log returns for SVJD calibration
     btc_df["log_return"] = np.log(btc_df["close"] / btc_df["close"].shift(1))
-
-    # Drop NaN values
     btc_df.dropna(inplace=True)
 
-    # Compute annualized drift (mean return)
-    mu = btc_df["log_return"].mean() * time_length / time_increment  # 
-    # Compute initial variance (V0)
+    # Drift
+    mu = btc_df["log_return"].mean()
+    # Initial variance
     V0 = btc_df["log_return"].var()
 
-    # Define jump threshold (2 standard deviations)
-    threshold = 2 * btc_df["log_return"].std()
-
-    # Identify jumps as large price movements
-    jumps = btc_df[np.abs(btc_df["log_return"]) > threshold]["log_return"]
-
-    # Compute jump intensity (λ): Average jumps per day
-    lambda_jump = len(jumps) / len(btc_df) * time_length / time_increment  
-
-    # Mean jump size (μ_J)
-    mu_J = jumps.mean()
-
-    # Jump size volatility (σ_J)
-    sigma_J = jumps.std()
-
-
-    # Fit GARCH(1,1) model to log returns
+    # Fit GARCH(1,1) model to estimate volatility parameters
     garch_model = arch_model(btc_df["log_return"], vol="Garch", p=1, q=1, rescale=False)
     garch_fit = garch_model.fit(disp="off")
 
-    # Extract GARCH model parameters
-    kappa = garch_fit.params["omega"]  # Mean reversion speed
-    theta = garch_fit.conditional_volatility.mean()**2  # Long-run variance
-    sigma_V = garch_fit.params["alpha[1]"]  # Volatility of variance
+    kappa = garch_fit.params["omega"]
+    theta = garch_fit.conditional_volatility.mean()**2
+    sigma = garch_fit.params["alpha[1]"]
 
-    # Compute rolling volatility (10-period moving standard deviation)
     btc_df["rolling_vol"] = btc_df["log_return"].rolling(window=10).std()
-
-    # Estimate correlation between returns and volatility
     rho = btc_df["log_return"].corr(btc_df["rolling_vol"])
 
-    svjd_params = {
+    heston_params = {
         "mu": mu,
         "V0": V0,
         "kappa": kappa,
         "theta": theta,
-        "sigma_V": sigma_V,
-        "rho": rho,
-        "lambda_jump": lambda_jump,
-        "mu_J": mu_J,
-        "sigma_J": sigma_J
+        "sigma": sigma,
+        "rho": rho
     }
-
-    return svjd_params
+    return heston_params
 
 
 
 def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, time_length, num_simulations) -> np.array:
-    SVID_params = get_SVJD_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
-    bt.logging.info(f"Here is SVID_params: {SVID_params}")
+    heston_params = get_Heston_parameters(start_time=start_time, time_increment=time_increment, time_length=time_length)
+    bt.logging.info(f"Here is SVID_params: {heston_params}")
+    print(heston_params)
 
     S0 = current_price
-    T = time_length
-    N = time_length // time_increment
-    dt = N/T
-    mu = SVID_params["mu"] # Expected return
-    V0 = SVID_params["V0"] # Initial variance
-    kappa = SVID_params['kappa'] # Mean reversion speed of variance
-    theta = SVID_params['theta'] # Long-run variance
-    sigma_V = SVID_params['sigma_V'] # Volatility of variance
-    rho = SVID_params['rho'] # Correlation between BTC returns and variance
-    lambda_jump = SVID_params['lambda_jump'] # Jump intensity (expected jumps per year)
-    mu_J = SVID_params['mu_J'] # Average jump size (log-normal)
-    sigma_J = SVID_params['sigma_J'] # Jump volatility
+    T = time_length / 86400  # Convert seconds to days
+    N = time_length // time_increment  # Number of steps
+    dt = T / N
+
+    mu = heston_params["mu"]
+    V0 = heston_params["V0"]
+    kappa = heston_params["kappa"]
+    theta = heston_params["theta"]
+    sigma = heston_params["sigma"]
+    rho = heston_params["rho"]
+
     num_paths = num_simulations
-    
-    # Correlated Brownian motions
-    W_S = np.random.randn(N, num_paths)  # BTC price Brownian motion
-    W_V = rho * W_S + np.sqrt(1 - rho**2) * np.random.randn(N, num_paths)  # Volatility Brownian motion
+
+    # Generate correlated Brownian motions
+    W_S = np.random.randn(N, num_paths)
+    W_V = rho * W_S + np.sqrt(1 - rho**2) * np.random.randn(N, num_paths)
 
     # Initialize price and variance paths
     S = np.zeros((N, num_paths))
@@ -194,15 +157,9 @@ def simulate_crypto_price_paths_SVID(current_price, start_time, time_increment, 
     S[0, :] = S0
     V[0, :] = V0
 
-    # Simulate paths
+    # Simulate paths using the Euler-Maruyama method
     for t in range(1, N):
-        # Stochastic variance process (Heston-like)
-        V[t] = np.maximum(V[t-1] + kappa * (theta - V[t-1]) * dt + sigma_V * np.sqrt(V[t-1] * dt) * W_V[t], 0)
-        
-        # Jump component (Poisson process)
-        num_jumps = np.random.poisson(lambda_jump * dt, num_paths)  # 0 or 1 most of the time
-        Jumps = np.where(num_jumps > 0, np.exp(mu_J + sigma_J * np.random.randn(num_paths)) - 1, 0)  # Only apply when jump occurs
-        # BTC price process
-        S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t]) * (1 + Jumps)
-        
+        V[t] = np.maximum(V[t-1] + kappa * (theta - V[t-1]) * dt + sigma * np.sqrt(V[t-1] * dt) * W_V[t], 0)
+        S[t] = S[t-1] * np.exp((mu - 0.5 * V[t]) * dt + np.sqrt(V[t] * dt) * W_S[t])
+
     return np.transpose(S)
